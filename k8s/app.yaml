@@ -17,6 +17,8 @@ metadata:
     demo: upwind-endor-runtime
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend
@@ -30,7 +32,7 @@ spec:
       containers:
       - name: backend
         image: ghcr.io/rd-endor/email-signature-backend:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
@@ -41,7 +43,7 @@ spec:
           value: "1"
         resources:
           requests:
-            cpu: 100m
+            cpu: 50m
             memory: 128Mi
           limits:
             cpu: 500m
@@ -88,6 +90,8 @@ metadata:
     tier: frontend
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: frontend
@@ -100,14 +104,14 @@ spec:
       containers:
       - name: frontend
         image: ghcr.io/rd-endor/email-signature-frontend:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http
         resources:
           requests:
-            cpu: 50m
-            memory: 64Mi
+            cpu: 10m
+            memory: 32Mi
           limits:
             cpu: 250m
             memory: 256Mi
@@ -126,7 +130,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  type: LoadBalancer
+  type: ClusterIP # FRONTEND_SERVICE_TYPE
   ports:
   - port: 80
     targetPort: 80
