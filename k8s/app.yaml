@@ -137,3 +137,67 @@ spec:
     name: http
   selector:
     app: frontend
+---
+# ----------------------------------------------------
+# PHP runtime (intentionally unpatched 8.4.26)
+# CVE-2026-109618, CVE-2026-109619
+# ----------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php
+  namespace: signature-demo
+  labels:
+    app: php
+    tier: php
+    demo: upwind-endor-runtime
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: php
+  template:
+    metadata:
+      labels:
+        app: php
+        tier: php
+        demo: upwind-endor-runtime
+    spec:
+      containers:
+      - name: php
+        image: ghcr.io/rd-endor/email-signature-php:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: php
+  namespace: signature-demo
+  labels:
+    app: php
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  selector:
+    app: php
