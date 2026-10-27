@@ -139,7 +139,8 @@ spec:
     app: frontend
 ---
 # ----------------------------------------------------
-# PHP runtime (intentionally unpatched 8.4.26)
+# PHP runtime for container scans. Debian php8.4 from trixie,
+# below the 8.4.27 fix. ClusterIP only.
 # CVE-2026-109618, CVE-2026-109619
 # ----------------------------------------------------
 apiVersion: apps/v1
