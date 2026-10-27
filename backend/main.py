@@ -98,13 +98,24 @@ async def upload_image(file: UploadFile = File(...)):
 # Authentication Endpoints
 # ----------------------------------------------------
 
+# Hard cap: maximum number of demo user accounts allowed
+MAX_USER_ACCOUNTS = 100
+
 @app.post("/api/auth/signup", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(user_data: schemas.UserSignup, db: Session = Depends(get_db)):
+    # Enforce demo account limit
+    user_count = db.query(models.User).count()
+    if user_count >= MAX_USER_ACCOUNTS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Registration is closed. This demo is limited to {MAX_USER_ACCOUNTS} accounts."
+        )
+
     # Check if username or email exists
     existing_user = db.query(models.User).filter(
         (models.User.username == user_data.username) | (models.User.email == user_data.email)
     ).first()
-    
+
     if existing_user:
         if existing_user.username == user_data.username:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is already taken")

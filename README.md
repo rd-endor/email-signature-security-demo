@@ -15,6 +15,8 @@ A full-stack email signature generator featuring a **Node.js (React + Vite + Tai
 - **🔐 User Authentication & Strong Passwords**:
   - Username & password sign-up and sign-in with PBKDF2 cryptographic hashing and JWT session tokens.
   - Enforced strong password policy (8+ chars, uppercase, lowercase, numbers, special characters) with real-time UI strength meter.
+  - Built-in Nginx reverse-proxy rate limiting (20 req/sec API, 10 req/min auth endpoints) with HTTP 429 throttling to protect against automated credential stuffing and DoS bots.
+  - Hard limit of 100 total user accounts enforced on the signup endpoint for demo isolation.
 - **💳 Credit Card Tokenization & Vault**:
   - PCI DSS-compliant tokenization vault (`tok_<brand>_<hash>`).
   - Card number Luhn algorithm validation & brand detection (Visa, Mastercard, Amex, Discover).
@@ -61,8 +63,12 @@ A full-stack email signature generator featuring a **Node.js (React + Vite + Tai
 │       ├── templates/       # Bulletproof HTML signature generators
 │       └── types/           # Template definitions & color palettes
 ├── docker-compose.yml       # Multi-container orchestration (Backend + Frontend)
-├── endor-labs-logo-2.png     # Logo asset
-├── endor-labs-logo-ss.png    # Square/Compact logo asset
+├── deploy-gke.sh            # GKE automated build, push & deployment script
+├── endor-labs-logo-2.png    # Logo asset
+├── endor-labs-logo-ss.png   # Square/Compact logo asset
+├── k8s/
+│   ├── app.yaml             # Kubernetes Namespace, Deployments & Services
+│   └── network-policy.yaml  # GCP IMDS & Cloud Metadata isolation NetworkPolicy
 ├── start.sh                 # One-click start script for local dev
 └── README.md
 ```
@@ -131,6 +137,105 @@ To run the frontend production build test:
 ```bash
 cd frontend && npm run build
 ```
+
+---
+
+---
+
+## ☁️ GKE Deployment & Upwind Integration
+
+This application is designed for cloud-native deployment to Google Kubernetes Engine (GKE) and integration with **Upwind Security** for runtime threat detection, reachability analysis, and workload protection.
+
+### 1. Cluster Information
+
+| Parameter | Value |
+| :--- | :--- |
+| **Cluster Name** | `upwind-integ-vuln-app-cluster-rd` |
+| **GCP Project** | `endor-experiments` |
+| **Zone / Region** | `us-central1-a` (`us-central1`) |
+| **Kubernetes Namespace** | `signature-demo` |
+| **Workload Label** | `demo: upwind-endor-runtime` |
+
+---
+
+### 2. Connect to GKE Cluster
+
+Authenticate `gcloud` and configure your `kubectl` context:
+
+```bash
+# Get cluster credentials
+gcloud container clusters get-credentials upwind-integ-vuln-app-cluster-rd \
+    --zone=us-central1-a \
+    --project=endor-experiments
+
+# Verify cluster connection
+kubectl get nodes
+```
+
+---
+
+### 3. Build & Deploy to GKE
+
+You can deploy using Google Artifact Registry (`endor-experiments/demo-repository`) or GitHub Container Registry:
+
+```bash
+# 1. Configure Docker authentication for Google Artifact Registry
+gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+# 2. Deploy privately without public internet exposure (default)
+INTERNET_EXPOSURE=false ./deploy-gke.sh
+
+# Or deploy with a public LoadBalancer IP:
+# INTERNET_EXPOSURE=true ./deploy-gke.sh
+```
+
+---
+
+### 4. Upwind Runtime Integration & Monitoring
+
+The Kubernetes manifests in [`k8s/app.yaml`](file:///Users/rdhakne/Documents/rd/git/catch-all-repos/email-signature-security-demo/k8s/app.yaml) are annotated with security labels to facilitate Upwind sensor discovery and runtime tracking:
+
+- **Namespace**: `signature-demo`
+- **Workload Labels**: `demo: upwind-endor-runtime`, `tier: backend`, `tier: frontend`
+- **Endpoints & Exposure**:
+  - `frontend-service`: Configurable via `INTERNET_EXPOSURE=false` (`ClusterIP`, default) or `INTERNET_EXPOSURE=true` (`LoadBalancer`).
+  - `backend`: Internal `ClusterIP` exposing FastAPI endpoints on port `8000`.
+
+#### Local Access (When Internet Exposure is Disabled)
+
+```bash
+# Port-forward frontend service to localhost
+kubectl port-forward svc/frontend-service 8080:80 -n signature-demo
+
+# Open http://localhost:8080 in your browser
+```
+
+#### Verify Deployment Status
+
+```bash
+# Check pod status
+kubectl get pods -n signature-demo
+
+# Check public load balancer IP
+kubectl get svc frontend-service -n signature-demo
+```
+
+---
+
+### 5. 🛡️ Security & Cloud Isolation (IMDS / Metadata Protection)
+
+Because this demonstration application contains intentional vulnerability test vectors for runtime detection tools (such as Upwind), safeguards are established to prevent lateral movement or access to the underlying GCP project:
+
+- **Network Policy Isolation ([`k8s/network-policy.yaml`](file:///Users/rdhakne/Documents/rd/git/catch-all-repos/email-signature-security-demo/k8s/network-policy.yaml))**:
+  Blocks pods from reaching the Google Cloud Instance Metadata Service (IMDS) at `169.254.169.254` and the `169.254.0.0/16` link-local range.
+  ```bash
+  # Apply IMDS blocking NetworkPolicy
+  kubectl apply -f k8s/network-policy.yaml
+  ```
+- **GKE Workload Identity**:
+  Replaces default node compute credentials with the GKE Metadata Server (`GKE_METADATA`), rejecting any unauthorized token queries from within containers.
+- **Least-Privilege Scopes**:
+  Pods operate under default unprivileged Kubernetes service accounts with no GCP IAM permissions.
 
 ---
 

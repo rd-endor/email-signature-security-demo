@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-gcp-metadata
+  namespace: signature-demo
+  labels:
+    security.policy: block-imds
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS resolution
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  # Allow all internal private cluster networks
+  - to:
+    - ipBlock:
+        cidr: 10.0.0.0/8
+    - ipBlock:
+        cidr: 172.16.0.0/12
+    - ipBlock:
+        cidr: 192.168.0.0/16
+  # Allow internet egress while explicitly excluding 169.254.0.0/16 (Link-Local & GCP Metadata)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/1
+    - ipBlock:
+        cidr: 128.0.0.0/3
+    - ipBlock:
+        cidr: 160.0.0.0/5
+    - ipBlock:
+        cidr: 168.0.0.0/6
+    - ipBlock:
+        cidr: 170.0.0.0/7
+    - ipBlock:
+        cidr: 172.0.0.0/6
+    - ipBlock:
+        cidr: 176.0.0.0/4
+    - ipBlock:
+        cidr: 192.0.0.0/2

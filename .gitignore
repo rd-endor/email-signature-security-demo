@@ -12,3 +12,7 @@ frontend/.vite/
 
 # macOS
 .DS_Store
+
+# Kubernetes Secrets & Credentials
+k8s/*secret*.yaml
+!k8s/*.template
